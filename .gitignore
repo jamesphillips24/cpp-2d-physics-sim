@@ -1,3 +1,5 @@
 src/build
 .DS_Store
 src/Library
+build
+.vscode

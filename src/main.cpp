@@ -15,6 +15,8 @@ int main(int arg, char* argv[]){
 		return -1;
 	}
 
+	SDL_Renderer* renderer;
+
 	bool done = false;
 	while(!done){
 		SDL_Event event;
