@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(SDL3 REQUIRED)
 
-add_executable(func main.cpp)
+add_executable(func
+    main.cpp
+    random_utils.cpp
+    )
 
 target_link_libraries(func PRIVATE SDL3::SDL3)
