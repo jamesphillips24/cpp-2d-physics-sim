@@ -7,8 +7,8 @@
 #define WINDOW_WIDTH 600
 #define WINDOW_HEIGHT 600
 
-#define TEXTURE_WIDTH 100
-#define TEXTURE_HEIGHT 100
+#define TEXTURE_WIDTH 10
+#define TEXTURE_HEIGHT 10
 
 class Ball {
 	public:
@@ -62,28 +62,39 @@ class Ball {
 		void check_position(){
 			// If it hits the right side
 			if(this->position[0] + TEXTURE_WIDTH >= WINDOW_WIDTH){
-				this->direction[0] *= -1;
+				this->direction[0] *= -0.9;
 				this->position[0] = WINDOW_WIDTH - TEXTURE_WIDTH - 1;
 			}
 
 			// If it hits the left side
 			if (this->position[0] <= 0)
 			{
-				this->direction[0] *= -1;
+				this->direction[0] *= -0.9;
 				this->position[0] = 1;
 			}
 
 			// If it hits the bottom
 			if (this->position[1] + TEXTURE_HEIGHT >= WINDOW_HEIGHT)
 			{
-				this->direction[1] *= -1;
+				// If it's sliding
+				if (this->direction[1] < 0.3)
+				{
+					// Prevent jittering (to an extent)
+					this->direction[1] = 0;
+					this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
+
+					// Friction
+					this->direction[0] *= 0.93;
+				}
+
+				this->direction[1] *= -0.8;
 				this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
 			}
 
 			// If it hits the top
 			if (this->position[1] <= 0)
 			{
-				this->direction[1] *= -1;
+				this->direction[1] *= -0.9;
 				this->position[1] = 1;
 			}
 		}

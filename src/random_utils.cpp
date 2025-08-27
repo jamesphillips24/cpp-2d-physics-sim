@@ -22,6 +22,6 @@ std::array<double, 2> generate_rand_arr()
 double generate_rand_single(){
     static std::random_device rnd_device;
     static std::mt19937 rnd_engine{rnd_device()};
-    static std::uniform_real_distribution<double> dist{0, 1.0};
+    static std::uniform_real_distribution<double> dist{5.0, 10.0};
     return dist(rnd_engine);
 }
