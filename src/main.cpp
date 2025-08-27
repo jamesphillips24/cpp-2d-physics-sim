@@ -128,6 +128,24 @@ int main(int arg, char* argv[]){
 				done = true;
 				break;
 			}
+
+			if(event.type == SDL_EVENT_MOUSE_BUTTON_DOWN){
+				bool mouse_up {false};
+				while(!mouse_up){
+					float x;
+					float y;
+
+					SDL_GetMouseState(&x, &y);
+
+					std::cout << x << " " << y << "\n";
+
+					if(SDL_PollEvent(&event) && event.type == SDL_EVENT_MOUSE_BUTTON_UP){
+						mouse_up = true;
+					}
+
+					
+				}
+			}
 		}
 		SDL_RenderClear(renderer);
 		b.render_ball(renderer);
