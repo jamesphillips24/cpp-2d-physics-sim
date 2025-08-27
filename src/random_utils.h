@@ -1,4 +1,5 @@
 #pragma once
 #include <array>
 
-std::array<int, 3> generate_rand();
+std::array<double, 2> generate_rand_arr();
+double generate_rand_single();

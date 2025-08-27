@@ -13,39 +13,79 @@
 class Ball {
 	public:
 		SDL_Texture* texture;
-		int x;
-		int y;
-		int direction;
+		std::array<double, 2> position;
+		std::array<double, 2> direction;
 
 		Ball(SDL_Renderer* renderer){
+			// Create texture
 			texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, TEXTURE_WIDTH, TEXTURE_HEIGHT);
-			this->x = 1;
-			this->y = WINDOW_HEIGHT / 2;
-			this->direction = 1;
+
+			// Get random starting direction (only bottom right quadrant direction)
+			double vec {generate_rand_single()};
+
+			// Initialize position and direction (start in the middle)
+			this->position[0] = WINDOW_WIDTH/2;
+			this->position[1] = WINDOW_HEIGHT/2;
+			this->direction[0] = vec;
+			this->direction[1] = 1 - vec;
 		};
 
 		void render_ball(SDL_Renderer* renderer){
-			this->direction *= is_touching_wall() ? -1 : 1;
-			this->x += this->direction;
+			// Gravity. Need to use framerate to calculate real gravity
+			this->direction[1] += 0.01;
 
+			// Velocity changes position
+			this->position[0] += this->direction[0];
+			this->position[1] += this->direction[1];
+
+			this->check_position();
+
+			// Update texture rectangle position
 			SDL_FRect r;
-			r.x = this->x;
-			r.y = this->y;
+			r.x = this->position[0];
+			r.y = this->position[1];
 			r.w = TEXTURE_WIDTH;
 			r.h = TEXTURE_HEIGHT;
 
+			// Draw new rectangle
 			SDL_Surface* surface;
-
 			if(SDL_LockTextureToSurface(this->texture, nullptr, &surface)){
 				SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGB(SDL_GetPixelFormatDetails(surface->format), nullptr, 255, 255, 255));
 				SDL_UnlockTexture(this->texture);
 			}
 
+			// Send new rectangle to render buffer
 			SDL_RenderTexture(renderer, this->texture, nullptr, &r);
 		}
 
-		bool is_touching_wall(){
-			return this->x + TEXTURE_WIDTH >= WINDOW_WIDTH || this->x <= 0;
+		// Can be optimized
+		void check_position(){
+			// If it hits the right side
+			if(this->position[0] + TEXTURE_WIDTH >= WINDOW_WIDTH){
+				this->direction[0] *= -1;
+				this->position[0] = WINDOW_WIDTH - TEXTURE_WIDTH - 1;
+			}
+
+			// If it hits the left side
+			if (this->position[0] <= 0)
+			{
+				this->direction[0] *= -1;
+				this->position[0] = 1;
+			}
+
+			// If it hits the bottom
+			if (this->position[1] + TEXTURE_HEIGHT >= WINDOW_HEIGHT)
+			{
+				this->direction[1] *= -1;
+				this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
+			}
+
+			// If it hits the top
+			if (this->position[1] <= 0)
+			{
+				this->direction[1] *= -1;
+				this->position[1] = 1;
+			}
 		}
 };
 
@@ -77,19 +117,11 @@ int main(int arg, char* argv[]){
 				done = true;
 				break;
 			}
-			if(event.type == SDL_EVENT_KEY_DOWN){
-				if(event.key.key == SDLK_SPACE){
-					std::array<int, 3> rgb{generate_rand()};
-					SDL_SetRenderDrawColor(renderer, rgb[0], rgb[1], rgb[2], SDL_ALPHA_OPAQUE);
-					SDL_RenderClear(renderer);
-					SDL_RenderPresent(renderer);
-				}
-			}
 		}
 		SDL_RenderClear(renderer);
 		b.render_ball(renderer);
 		SDL_RenderPresent(renderer);
-		SDL_Delay(10);
+		SDL_Delay(2);
 	}
 
 	SDL_DestroyRenderer(renderer);
