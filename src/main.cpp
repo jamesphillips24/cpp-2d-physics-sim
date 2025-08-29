@@ -17,6 +17,8 @@
 
 #define NUM_PREV_CURSOR_POS 5
 
+#define FRAMES_PER_SECOND_MS 1000/60
+
 class Ball {
 	public:
 		SDL_Texture* texture;
@@ -131,6 +133,8 @@ class Ball {
 };
 
 int main(int arg, char* argv[]){
+	Uint64 frameStart;
+	int frameTime;
 	SDL_Init(SDL_INIT_VIDEO);
 
 	SDL_Window* window;
@@ -153,6 +157,7 @@ int main(int arg, char* argv[]){
 
 	bool done = false;
 	while(!done){
+		frameStart = SDL_GetTicks();
 		SDL_Event event;
 
 		while(SDL_PollEvent(&event)){
@@ -204,24 +209,25 @@ int main(int arg, char* argv[]){
 						std::cout << "X: " << x_temp << "\n";
 						std::cout << "Y: " << y_temp << "\n";
 
-						b.velocity[0] = x_temp / NUM_PREV_CURSOR_POS;
-						b.velocity[1] = y_temp / NUM_PREV_CURSOR_POS;
+						b.velocity[0] = (x_temp / NUM_PREV_CURSOR_POS) / 2;
+						b.velocity[1] = (y_temp / NUM_PREV_CURSOR_POS) / 2;
 					}
 
 					if(SDL_PollEvent(&event) && event.type == SDL_EVENT_MOUSE_BUTTON_UP){
 						mouse_up = true;
 					}
 				}
-
-
-
 			}
 		}
 		SDL_RenderClear(renderer);
 		b.update_position();
 		b.render_ball(renderer);
 		SDL_RenderPresent(renderer);
-		SDL_Delay(2);
+
+		frameTime = SDL_GetTicks() - frameStart;
+		if(frameTime < FRAMES_PER_SECOND_MS){
+			SDL_Delay(frameTime);
+		}
 	}
 
 	SDL_DestroyRenderer(renderer);
