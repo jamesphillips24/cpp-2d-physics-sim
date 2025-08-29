@@ -19,9 +19,9 @@ std::array<double, 2> generate_rand_arr()
     return rgb;
 }
 
-double generate_rand_single(){
+double generate_rand_vector(){
     static std::random_device rnd_device;
     static std::mt19937 rnd_engine{rnd_device()};
-    static std::uniform_real_distribution<double> dist{30.0, 50.0};
+    static std::uniform_real_distribution<double> dist{30.0, 50.0}; // Range of random starting speeds
     return dist(rnd_engine);
 }

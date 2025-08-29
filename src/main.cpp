@@ -1,5 +1,6 @@
 #include <iostream>
 #include <random>
+#include <cmath>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "random_utils.h"
@@ -7,8 +8,7 @@
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
 
-#define TEXTURE_WIDTH 10
-#define TEXTURE_HEIGHT 10
+#define TEXTURE_RADIUS 30
 
 #define FRAMES_PER_SECOND_MS 1000 / 60
 
@@ -36,12 +36,12 @@ class Ball {
 		std::array<std::array<double, 2>, NUM_PREV_CURSOR_POS + NUM_CURSOR_TRACK_BUFFER> cursor_positions{};
 		int cursor_pos_index;
 
-		Ball(SDL_Renderer* renderer){
+		Ball(SDL_Renderer* renderer, SDL_Texture* texture){
 			// Create texture
-			texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+			this->texture = texture;
 
 			// Get random starting direction (only bottom right quadrant direction)
-			double vec {generate_rand_single()};
+			double vec {generate_rand_vector()};
 
 			// Initialize position and direction (start in the middle)
 			this->position[0] = WINDOW_WIDTH/2;
@@ -57,15 +57,8 @@ class Ball {
 			SDL_FRect r;
 			r.x = this->position[0];
 			r.y = this->position[1];
-			r.w = TEXTURE_WIDTH;
-			r.h = TEXTURE_HEIGHT;
-
-			// Draw new rectangle
-			SDL_Surface* surface;
-			if(SDL_LockTextureToSurface(this->texture, nullptr, &surface)){
-				SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGB(SDL_GetPixelFormatDetails(surface->format), nullptr, 255, 255, 255));
-				SDL_UnlockTexture(this->texture);
-			}
+			r.w = TEXTURE_RADIUS;
+			r.h = TEXTURE_RADIUS;
 
 			// Send new rectangle to render buffer
 			SDL_RenderTexture(renderer, this->texture, nullptr, &r);
@@ -89,9 +82,9 @@ class Ball {
 		// Can be optimized
 		void check_position(){
 			// If it hits the right side
-			if(this->position[0] + TEXTURE_WIDTH >= WINDOW_WIDTH){
+			if(this->position[0] + TEXTURE_RADIUS >= WINDOW_WIDTH){
 				this->velocity[0] *= -ENERGY_LOSS_BOUNCE_WALL;
-				this->position[0] = WINDOW_WIDTH - TEXTURE_WIDTH - 1;
+				this->position[0] = WINDOW_WIDTH - TEXTURE_RADIUS - 1;
 				return;
 			}
 
@@ -104,12 +97,12 @@ class Ball {
 			}
 
 			// If it hits the bottom
-			if (this->position[1] + TEXTURE_HEIGHT >= WINDOW_HEIGHT)
+			if (this->position[1] + TEXTURE_RADIUS >= WINDOW_HEIGHT)
 			{
 				this->velocity[0] *= ENERGY_LOSS_FRICTION;
 
 				this->velocity[1] *= -ENERGY_LOSS_BOUNCE_FLOOR;
-				this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
+				this->position[1] = WINDOW_HEIGHT - TEXTURE_RADIUS - 1;
 				return;
 			}
 
@@ -161,6 +154,25 @@ class Ball {
 		}
 };
 
+SDL_Texture* create_circle_texture(SDL_Renderer* renderer){
+	int radius = TEXTURE_RADIUS;
+	SDL_Surface *surface = SDL_CreateSurface(radius*2, radius*2, SDL_PIXELFORMAT_RGBA8888);
+	SDL_FillSurfaceRect(surface, NULL, SDL_MapRGBA(SDL_GetPixelFormatDetails(surface->format), nullptr, 255, 255, 255, 0));
+
+	for(int i = -radius; i < radius; i++){
+		for (int j = -radius; j < radius; j++){
+			if(i*i + j*j <= radius*radius){
+				SDL_WriteSurfacePixel(surface, i + radius, j + radius, 255, 255, 255, 255);
+			}
+		}
+	}
+
+	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+	SDL_DestroySurface(surface);
+
+	return texture;
+}
+
 int main(int arg, char* argv[]){
 	SDL_Init(SDL_INIT_VIDEO);
 
@@ -178,7 +190,9 @@ int main(int arg, char* argv[]){
 		return -1;
 	}
 
-	Ball b{renderer};
+	SDL_Texture* texture = create_circle_texture(renderer);
+
+	Ball b{renderer, texture};
 
 	Uint64 frameStart;
 	int frameTime;
@@ -206,7 +220,7 @@ int main(int arg, char* argv[]){
 			float y;
 
 			SDL_GetMouseState(&x, &y);
-			b.update_position(x - TEXTURE_WIDTH / 2, y - TEXTURE_HEIGHT);
+			b.update_position(x - TEXTURE_RADIUS / 2, y - TEXTURE_RADIUS);
 			b.track_cursor_position({x, y});
 			b.update_cursor_velocity();
 		}
