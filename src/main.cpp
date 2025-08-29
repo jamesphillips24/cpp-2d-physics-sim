@@ -15,7 +15,11 @@
 #define ENERGY_LOSS_BOUNCE_FLOOR 0.8
 #define ENERGY_LOSS_FRICTION 0.93
 
-#define NUM_PREV_CURSOR_POS 5
+// How far back to track cursor positions for calculating velocity after throw
+#define NUM_PREV_CURSOR_POS 10
+// How many of the most recent positions should it ignore (in case cursor stopped
+// at the end of a throw unintentionally)
+#define NUM_CURSOR_TRACK_BUFFER 2
 
 #define FRAMES_PER_SECOND_MS 1000/60
 
@@ -24,7 +28,7 @@ class Ball {
 		SDL_Texture* texture;
 		std::array<double, 2> position;
 		std::array<double, 2> velocity;
-		std::array<std::array<double, 2>, NUM_PREV_CURSOR_POS> cursor_positions{};
+		std::array<std::array<double, 2>, NUM_PREV_CURSOR_POS + NUM_CURSOR_TRACK_BUFFER> cursor_positions{};
 		int cursor_pos_index;
 
 		Ball(SDL_Renderer* renderer){
@@ -119,7 +123,7 @@ class Ball {
 			}
 		}
 
-		void get_cursor_position(std::array<float, 2> pos){
+		void track_cursor_position(std::array<float, 2> pos){
 			this->cursor_positions[this->cursor_pos_index][0] = pos[0];
 			this->cursor_positions[this->cursor_pos_index][1] = pos[1];
 
@@ -130,11 +134,35 @@ class Ball {
 				this->cursor_pos_index++;
 			}
 		}
+
+		void update_cursor_velocity(){
+			double x_temp{0};
+			double y_temp{0};
+
+			int starting_index {(int)((this->cursor_pos_index - NUM_CURSOR_TRACK_BUFFER - 1 + this->cursor_positions.size()) % this->cursor_positions.size())};
+			int i {0};
+			for (i = starting_index;; i--)
+			{
+				if (i == -1)
+				{
+					i = this->cursor_positions.size() - 1;
+				}
+
+				x_temp -= this->cursor_positions[i][0] - this->cursor_positions[(i - 1 + this->cursor_positions.size()) % this->cursor_positions.size()][0];
+				y_temp -= this->cursor_positions[i][1] - this->cursor_positions[(i - 1 + this->cursor_positions.size()) % this->cursor_positions.size()][1];
+
+				if(i == this->cursor_pos_index)
+				{
+					break;
+				}
+			}
+
+			this->velocity[0] = (x_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER)) / 2;
+			this->velocity[1] = (y_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER)) / 2;
+		}
 };
 
 int main(int arg, char* argv[]){
-	Uint64 frameStart;
-	int frameTime;
 	SDL_Init(SDL_INIT_VIDEO);
 
 	SDL_Window* window;
@@ -153,9 +181,10 @@ int main(int arg, char* argv[]){
 
 	Ball b{renderer};
 	int flag {0};
-	int tracks {0};
 
 	bool done = false;
+	Uint64 frameStart;
+	int frameTime;
 	while(!done){
 		frameStart = SDL_GetTicks();
 		SDL_Event event;
@@ -168,7 +197,6 @@ int main(int arg, char* argv[]){
 
 			if(event.type == SDL_EVENT_MOUSE_BUTTON_DOWN){
 				bool mouse_up {false};
-				tracks = 0;
 				while(!mouse_up){
 					flag++;
 					float x;
@@ -180,38 +208,8 @@ int main(int arg, char* argv[]){
 					b.render_ball(renderer);
 					SDL_RenderPresent(renderer);
 
-					// Update cursor velocity
-					if(flag >= 5){
-						b.get_cursor_position({x, y});
-						tracks++;
-						flag = 0;
-					}
-
-					if(tracks > NUM_PREV_CURSOR_POS){
-						double x_temp{0};
-						double y_temp{0};
-						for (int i = b.cursor_pos_index;; i++)
-						{
-							if (i >= NUM_PREV_CURSOR_POS)
-							{
-								i = 0;
-							}
-
-							x_temp += b.cursor_positions[(b.cursor_pos_index + 1) % NUM_PREV_CURSOR_POS][0] - b.cursor_positions[b.cursor_pos_index][0];
-							y_temp += b.cursor_positions[(b.cursor_pos_index + 1) % NUM_PREV_CURSOR_POS][1] - b.cursor_positions[b.cursor_pos_index][1];
-
-							if (i == (b.cursor_pos_index + NUM_PREV_CURSOR_POS - 1) % NUM_PREV_CURSOR_POS)
-							{
-								break;
-							}
-						}
-
-						std::cout << "X: " << x_temp << "\n";
-						std::cout << "Y: " << y_temp << "\n";
-
-						b.velocity[0] = (x_temp / NUM_PREV_CURSOR_POS) / 2;
-						b.velocity[1] = (y_temp / NUM_PREV_CURSOR_POS) / 2;
-					}
+					b.track_cursor_position({x, y});
+					b.update_cursor_velocity();
 
 					if(SDL_PollEvent(&event) && event.type == SDL_EVENT_MOUSE_BUTTON_UP){
 						mouse_up = true;
