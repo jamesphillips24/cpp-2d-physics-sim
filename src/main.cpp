@@ -4,24 +4,29 @@
 #include <SDL3/SDL_main.h>
 #include "random_utils.h"
 
-#define WINDOW_WIDTH 600
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH 1200
+#define WINDOW_HEIGHT 800
 
 #define TEXTURE_WIDTH 10
 #define TEXTURE_HEIGHT 10
+
+#define FRAMES_PER_SECOND_MS 1000 / 60
 
 // Need to make more dynamic based on normal vector
 #define ENERGY_LOSS_BOUNCE_WALL 0.9
 #define ENERGY_LOSS_BOUNCE_FLOOR 0.8
 #define ENERGY_LOSS_FRICTION 0.97
 
+#define GRAVITY 3
+
 // How far back to track cursor positions for calculating velocity after throw
 #define NUM_PREV_CURSOR_POS 10
+
 // How many of the most recent positions should it ignore (in case cursor stopped
 // at the end of a throw unintentionally)
 #define NUM_CURSOR_TRACK_BUFFER 2
 
-#define FRAMES_PER_SECOND_MS 1000/60
+#define CURSOR_VELOCITY_SCALAR 1.5
 
 class Ball {
 	public:
@@ -67,8 +72,7 @@ class Ball {
 		}
 
 		void update_position(){
-			// Gravity. Need to use framerate to calculate real gravity
-			this->velocity[1] += 3;
+			this->velocity[1] += GRAVITY;
 
 			// Velocity changes position
 			this->position[0] += this->velocity[0];
@@ -88,6 +92,7 @@ class Ball {
 			if(this->position[0] + TEXTURE_WIDTH >= WINDOW_WIDTH){
 				this->velocity[0] *= -ENERGY_LOSS_BOUNCE_WALL;
 				this->position[0] = WINDOW_WIDTH - TEXTURE_WIDTH - 1;
+				return;
 			}
 
 			// If it hits the left side
@@ -95,6 +100,7 @@ class Ball {
 			{
 				this->velocity[0] *= -ENERGY_LOSS_BOUNCE_WALL;
 				this->position[0] = 1;
+				return;
 			}
 
 			// If it hits the bottom
@@ -104,6 +110,7 @@ class Ball {
 
 				this->velocity[1] *= -ENERGY_LOSS_BOUNCE_FLOOR;
 				this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
+				return;
 			}
 
 			// If it hits the top
@@ -111,6 +118,7 @@ class Ball {
 			{
 				this->velocity[1] *= -ENERGY_LOSS_BOUNCE_WALL;
 				this->position[1] = 1;
+				return;
 			}
 		}
 
@@ -148,8 +156,8 @@ class Ball {
 				}
 			}
 
-			this->velocity[0] = (x_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER));
-			this->velocity[1] = (y_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER));
+			this->velocity[0] = (x_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER)) * CURSOR_VELOCITY_SCALAR;
+			this->velocity[1] = (y_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER)) * CURSOR_VELOCITY_SCALAR;
 		}
 };
 
