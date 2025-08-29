@@ -13,7 +13,7 @@
 // Need to make more dynamic based on normal vector
 #define ENERGY_LOSS_BOUNCE_WALL 0.9
 #define ENERGY_LOSS_BOUNCE_FLOOR 0.8
-#define ENERGY_LOSS_FRICTION 0.93
+#define ENERGY_LOSS_FRICTION 0.97
 
 // How far back to track cursor positions for calculating velocity after throw
 #define NUM_PREV_CURSOR_POS 10
@@ -68,7 +68,7 @@ class Ball {
 
 		void update_position(){
 			// Gravity. Need to use framerate to calculate real gravity
-			this->velocity[1] += 0.01;
+			this->velocity[1] += 3;
 
 			// Velocity changes position
 			this->position[0] += this->velocity[0];
@@ -100,18 +100,9 @@ class Ball {
 			// If it hits the bottom
 			if (this->position[1] + TEXTURE_HEIGHT >= WINDOW_HEIGHT)
 			{
-				// If it's sliding (manually chosen)
-				if (this->velocity[1] < 0.3)
-				{
-					// Prevent jittering (to an extent)
-					this->velocity[1] = 0;
-					this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
+				this->velocity[0] *= ENERGY_LOSS_FRICTION;
 
-					// Friction
-					this->velocity[0] *= ENERGY_LOSS_BOUNCE_FLOOR;
-				}
-
-				this->velocity[1] *= -ENERGY_LOSS_FRICTION;
+				this->velocity[1] *= -ENERGY_LOSS_BOUNCE_FLOOR;
 				this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
 			}
 
@@ -157,8 +148,8 @@ class Ball {
 				}
 			}
 
-			this->velocity[0] = (x_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER)) / 2;
-			this->velocity[1] = (y_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER)) / 2;
+			this->velocity[0] = (x_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER));
+			this->velocity[1] = (y_temp / (this->cursor_positions.size() - NUM_CURSOR_TRACK_BUFFER));
 		}
 };
 
@@ -180,43 +171,38 @@ int main(int arg, char* argv[]){
 	}
 
 	Ball b{renderer};
-	int flag {0};
 
-	bool done = false;
 	Uint64 frameStart;
 	int frameTime;
+	bool done = false;
+	bool mouse_up {true};
 	while(!done){
 		frameStart = SDL_GetTicks();
-		SDL_Event event;
 
+		SDL_Event event;
 		while(SDL_PollEvent(&event)){
 			if(event.type == SDL_EVENT_QUIT){
 				done = true;
 				break;
 			}
-
 			if(event.type == SDL_EVENT_MOUSE_BUTTON_DOWN){
-				bool mouse_up {false};
-				while(!mouse_up){
-					flag++;
-					float x;
-					float y;
-
-					SDL_GetMouseState(&x, &y);
-					SDL_RenderClear(renderer);
-					b.update_position(x - TEXTURE_WIDTH/2, y - TEXTURE_HEIGHT/2);
-					b.render_ball(renderer);
-					SDL_RenderPresent(renderer);
-
-					b.track_cursor_position({x, y});
-					b.update_cursor_velocity();
-
-					if(SDL_PollEvent(&event) && event.type == SDL_EVENT_MOUSE_BUTTON_UP){
-						mouse_up = true;
-					}
-				}
+				mouse_up = false;
+			}
+			if(event.type == SDL_EVENT_MOUSE_BUTTON_UP){
+				mouse_up = true;
 			}
 		}
+
+		if(!mouse_up){
+			float x;
+			float y;
+
+			SDL_GetMouseState(&x, &y);
+			b.update_position(x - TEXTURE_WIDTH / 2, y - TEXTURE_HEIGHT);
+			b.track_cursor_position({x, y});
+			b.update_cursor_velocity();
+		}
+
 		SDL_RenderClear(renderer);
 		b.update_position();
 		b.render_ball(renderer);
@@ -224,7 +210,7 @@ int main(int arg, char* argv[]){
 
 		frameTime = SDL_GetTicks() - frameStart;
 		if(frameTime < FRAMES_PER_SECOND_MS){
-			SDL_Delay(frameTime);
+			SDL_Delay(FRAMES_PER_SECOND_MS - frameTime);
 		}
 	}
 
