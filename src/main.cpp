@@ -10,11 +10,20 @@
 #define TEXTURE_WIDTH 10
 #define TEXTURE_HEIGHT 10
 
+// Need to make more dynamic based on normal vector
+#define ENERGY_LOSS_BOUNCE_WALL 0.9
+#define ENERGY_LOSS_BOUNCE_FLOOR 0.8
+#define ENERGY_LOSS_FRICTION 0.93
+
+#define NUM_PREV_CURSOR_POS 5
+
 class Ball {
 	public:
 		SDL_Texture* texture;
 		std::array<double, 2> position;
-		std::array<double, 2> direction;
+		std::array<double, 2> velocity;
+		std::array<std::array<double, 2>, NUM_PREV_CURSOR_POS> cursor_positions{};
+		int cursor_pos_index;
 
 		Ball(SDL_Renderer* renderer){
 			// Create texture
@@ -26,20 +35,13 @@ class Ball {
 			// Initialize position and direction (start in the middle)
 			this->position[0] = WINDOW_WIDTH/2;
 			this->position[1] = WINDOW_HEIGHT/2;
-			this->direction[0] = vec;
-			this->direction[1] = 1 - vec;
+			this->velocity[0] = vec;
+			this->velocity[1] = 1 - vec;
+
+			this->cursor_pos_index = 0;
 		};
 
 		void render_ball(SDL_Renderer* renderer){
-			// Gravity. Need to use framerate to calculate real gravity
-			this->direction[1] += 0.01;
-
-			// Velocity changes position
-			this->position[0] += this->direction[0];
-			this->position[1] += this->direction[1];
-
-			this->check_position();
-
 			// Update texture rectangle position
 			SDL_FRect r;
 			r.x = this->position[0];
@@ -58,44 +60,72 @@ class Ball {
 			SDL_RenderTexture(renderer, this->texture, nullptr, &r);
 		}
 
+		void update_position(){
+			// Gravity. Need to use framerate to calculate real gravity
+			this->velocity[1] += 0.01;
+
+			// Velocity changes position
+			this->position[0] += this->velocity[0];
+			this->position[1] += this->velocity[1];
+
+			this->check_position();
+		}
+
+		void update_position(float x, float y){
+			this->position[0] = x;
+			this->position[1] = y;
+		}
+
 		// Can be optimized
 		void check_position(){
 			// If it hits the right side
 			if(this->position[0] + TEXTURE_WIDTH >= WINDOW_WIDTH){
-				this->direction[0] *= -0.9;
+				this->velocity[0] *= -ENERGY_LOSS_BOUNCE_WALL;
 				this->position[0] = WINDOW_WIDTH - TEXTURE_WIDTH - 1;
 			}
 
 			// If it hits the left side
 			if (this->position[0] <= 0)
 			{
-				this->direction[0] *= -0.9;
+				this->velocity[0] *= -ENERGY_LOSS_BOUNCE_WALL;
 				this->position[0] = 1;
 			}
 
 			// If it hits the bottom
 			if (this->position[1] + TEXTURE_HEIGHT >= WINDOW_HEIGHT)
 			{
-				// If it's sliding
-				if (this->direction[1] < 0.3)
+				// If it's sliding (manually chosen)
+				if (this->velocity[1] < 0.3)
 				{
 					// Prevent jittering (to an extent)
-					this->direction[1] = 0;
+					this->velocity[1] = 0;
 					this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
 
 					// Friction
-					this->direction[0] *= 0.93;
+					this->velocity[0] *= ENERGY_LOSS_BOUNCE_FLOOR;
 				}
 
-				this->direction[1] *= -0.8;
+				this->velocity[1] *= -ENERGY_LOSS_FRICTION;
 				this->position[1] = WINDOW_HEIGHT - TEXTURE_HEIGHT - 1;
 			}
 
 			// If it hits the top
 			if (this->position[1] <= 0)
 			{
-				this->direction[1] *= -0.9;
+				this->velocity[1] *= -ENERGY_LOSS_BOUNCE_WALL;
 				this->position[1] = 1;
+			}
+		}
+
+		void get_cursor_position(std::array<float, 2> pos){
+			this->cursor_positions[this->cursor_pos_index][0] = pos[0];
+			this->cursor_positions[this->cursor_pos_index][1] = pos[1];
+
+			if(this->cursor_pos_index == this->cursor_positions.size() - 1){
+				this->cursor_pos_index = 0;
+			}
+			else{
+				this->cursor_pos_index++;
 			}
 		}
 };
@@ -118,6 +148,8 @@ int main(int arg, char* argv[]){
 	}
 
 	Ball b{renderer};
+	int flag {0};
+	int tracks {0};
 
 	bool done = false;
 	while(!done){
@@ -131,23 +163,62 @@ int main(int arg, char* argv[]){
 
 			if(event.type == SDL_EVENT_MOUSE_BUTTON_DOWN){
 				bool mouse_up {false};
+				tracks = 0;
 				while(!mouse_up){
+					flag++;
 					float x;
 					float y;
 
 					SDL_GetMouseState(&x, &y);
+					SDL_RenderClear(renderer);
+					b.update_position(x - TEXTURE_WIDTH/2, y - TEXTURE_HEIGHT/2);
+					b.render_ball(renderer);
+					SDL_RenderPresent(renderer);
 
-					std::cout << x << " " << y << "\n";
+					// Update cursor velocity
+					if(flag >= 5){
+						b.get_cursor_position({x, y});
+						tracks++;
+						flag = 0;
+					}
+
+					if(tracks > NUM_PREV_CURSOR_POS){
+						double x_temp{0};
+						double y_temp{0};
+						for (int i = b.cursor_pos_index;; i++)
+						{
+							if (i >= NUM_PREV_CURSOR_POS)
+							{
+								i = 0;
+							}
+
+							x_temp += b.cursor_positions[(b.cursor_pos_index + 1) % NUM_PREV_CURSOR_POS][0] - b.cursor_positions[b.cursor_pos_index][0];
+							y_temp += b.cursor_positions[(b.cursor_pos_index + 1) % NUM_PREV_CURSOR_POS][1] - b.cursor_positions[b.cursor_pos_index][1];
+
+							if (i == (b.cursor_pos_index + NUM_PREV_CURSOR_POS - 1) % NUM_PREV_CURSOR_POS)
+							{
+								break;
+							}
+						}
+
+						std::cout << "X: " << x_temp << "\n";
+						std::cout << "Y: " << y_temp << "\n";
+
+						b.velocity[0] = x_temp / NUM_PREV_CURSOR_POS;
+						b.velocity[1] = y_temp / NUM_PREV_CURSOR_POS;
+					}
 
 					if(SDL_PollEvent(&event) && event.type == SDL_EVENT_MOUSE_BUTTON_UP){
 						mouse_up = true;
 					}
-
-					
 				}
+
+
+
 			}
 		}
 		SDL_RenderClear(renderer);
+		b.update_position();
 		b.render_ball(renderer);
 		SDL_RenderPresent(renderer);
 		SDL_Delay(2);
