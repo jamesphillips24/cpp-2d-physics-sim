@@ -2,13 +2,19 @@ James Phillips 8/25/25
 
 This is my cpp physics engine.
 
-So far, I intend to make a rather simple 2D physics simulation.
+So far, I have a single body physics simulation with a bouncing ball.
+You can hold left mouse button down to move it and release to throw it.
 
 ToDo:
-- Working on moving the rect with the mouse.
-- Mouse tracking works, but I realized in order to update the rect's position, I'd ned to call render_ball() which also deals with the ball
-movement.
-- Probably best to make 2 functions: move_ball() and render_ball() or
-something similar.
-- Afterwards, track the cursor's previous locations in order to average
-out velocity when mouse lets go.
+- Continue optimizing
+- Introduce a second ball (dun dun dunnnn)
+- Add cool debugging features with debug mode:
+    - Live fps counter
+    - Replay with slider by tracking balls previous position
+    - Determinsitc reruns to see effects of chaning things (like physics tick rate)
+
+Issues:
+- Annoying: Moving your cursor floods the event poll, reducing the fps by
+a lot. Filtering out the event in multiple ways hasn't helped, even when it's
+obvious that the program isn't responding to the event.
+- Need to look in to position interpolating to make it less choppy (idrk what this means)
