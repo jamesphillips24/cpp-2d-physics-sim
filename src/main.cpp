@@ -5,12 +5,10 @@
 #include <SDL3/SDL_main.h>
 #include "random_utils.h"
 
-#define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 800
+#define WINDOW_WIDTH 500
+#define WINDOW_HEIGHT 500
 
-#define TEXTURE_RADIUS 30
-
-#define FRAMES_PER_SECOND_MS 1000 / 60
+#define TEXTURE_RADIUS 20
 
 // Need to make more dynamic based on normal vector
 #define ENERGY_LOSS_BOUNCE_WALL 0.9
@@ -24,9 +22,11 @@
 
 // How many of the most recent positions should it ignore (in case cursor stopped
 // at the end of a throw unintentionally)
-#define NUM_CURSOR_TRACK_BUFFER 2
+#define NUM_CURSOR_TRACK_BUFFER 5
 
 #define CURSOR_VELOCITY_SCALAR 1.5
+
+#define PHYSICS_TICK_PER_SECOND_MS 1000.0 / 60.0
 
 class Ball {
 	public:
@@ -34,6 +34,7 @@ class Ball {
 		std::array<double, 2> position;
 		std::array<double, 2> velocity;
 		std::array<std::array<double, 2>, NUM_PREV_CURSOR_POS + NUM_CURSOR_TRACK_BUFFER> cursor_positions{};
+		SDL_FRect r;
 		int cursor_pos_index;
 
 		Ball(SDL_Renderer* renderer, SDL_Texture* texture){
@@ -54,14 +55,13 @@ class Ball {
 
 		void render_ball(SDL_Renderer* renderer){
 			// Update texture rectangle position
-			SDL_FRect r;
-			r.x = this->position[0];
-			r.y = this->position[1];
-			r.w = TEXTURE_RADIUS;
-			r.h = TEXTURE_RADIUS;
+			this->r.x = this->position[0];
+			this->r.y = this->position[1];
+			this->r.w = TEXTURE_RADIUS;
+			this->r.h = TEXTURE_RADIUS;
 
 			// Send new rectangle to render buffer
-			SDL_RenderTexture(renderer, this->texture, nullptr, &r);
+			SDL_RenderTexture(renderer, this->texture, nullptr, &this->r);
 		}
 
 		void update_position(){
@@ -127,6 +127,11 @@ class Ball {
 			}
 		}
 
+		void kill_velocity(){
+			this->velocity[0] = 0;
+			this->velocity[1] = 0;
+		}
+
 		void update_cursor_velocity(){
 			double x_temp{0};
 			double y_temp{0};
@@ -189,29 +194,42 @@ int main(int arg, char* argv[]){
 		SDL_Log("SDL_CreateRenderer: %s\n", SDL_GetError());
 		return -1;
 	}
+	SDL_SetRenderVSync(renderer, SDL_RENDERER_VSYNC_ADAPTIVE);
 
 	SDL_Texture* texture = create_circle_texture(renderer);
 
 	Ball b{renderer, texture};
 
-	Uint64 frameStart;
-	int frameTime;
-	bool done = false;
+	Uint64 frame_start;
+	Uint64 frame_start_prev;
+	double accumulator{0};
+	bool done {false};
 	bool mouse_up {true};
+	SDL_Event event;
+	Uint64 cycle {0};
 	while(!done){
-		frameStart = SDL_GetTicks();
+		cycle++;
+		frame_start = SDL_GetTicks();
+		accumulator += frame_start - frame_start_prev;
+		frame_start_prev = frame_start;
 
-		SDL_Event event;
 		while(SDL_PollEvent(&event)){
+			if(event.type == SDL_EVENT_MOUSE_MOTION){
+				continue;
+			}
 			if(event.type == SDL_EVENT_QUIT){
 				done = true;
 				break;
 			}
 			if(event.type == SDL_EVENT_MOUSE_BUTTON_DOWN){
 				mouse_up = false;
+				b.kill_velocity();
+				break;
 			}
 			if(event.type == SDL_EVENT_MOUSE_BUTTON_UP){
 				mouse_up = true;
+				b.update_cursor_velocity();
+				break;
 			}
 		}
 
@@ -220,20 +238,21 @@ int main(int arg, char* argv[]){
 			float y;
 
 			SDL_GetMouseState(&x, &y);
-			b.update_position(x - TEXTURE_RADIUS / 2, y - TEXTURE_RADIUS);
+			b.update_position(x - TEXTURE_RADIUS / 2, y - TEXTURE_RADIUS / 2);
 			b.track_cursor_position({x, y});
-			b.update_cursor_velocity();
+		}
+
+		while (accumulator >= PHYSICS_TICK_PER_SECOND_MS)
+		{
+			if(mouse_up){
+				b.update_position();
+			}
+			accumulator -= PHYSICS_TICK_PER_SECOND_MS;
 		}
 
 		SDL_RenderClear(renderer);
-		b.update_position();
 		b.render_ball(renderer);
 		SDL_RenderPresent(renderer);
-
-		frameTime = SDL_GetTicks() - frameStart;
-		if(frameTime < FRAMES_PER_SECOND_MS){
-			SDL_Delay(FRAMES_PER_SECOND_MS - frameTime);
-		}
 	}
 
 	SDL_DestroyRenderer(renderer);
